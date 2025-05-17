@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PomodoReport</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .fade-in {
+      animation: fadeIn 0.5s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  </style>
+</head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-YGMQRWDWV3"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-YGMQRWDWV3');
+</script>
+<body class="bg-gray-100 font-sans p-4">
+  <div class="max-w-xl w-full mx-auto bg-white shadow-xl rounded-2xl p-4 sm:p-6 fade-in">
+    <h1 class="text-2xl sm:text-3xl font-bold text-center mb-6">PomodoReport</h1>
+
+    <!-- Search & Filter -->
+    <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <input id="searchInput" type="text" placeholder="検索..." class="w-full sm:w-1/2 p-2 border rounded-xl" oninput="renderLogs()">
+      <select id="tagFilter" class="border p-2 rounded-xl" onchange="renderLogs()">
+        <option value="">すべてのタグ</option>
+      </select>
+    </div>
+
+    <!-- Timer Section -->
+    <div class="text-center mb-6">
+      <h2 class="text-xl font-semibold mb-2">ポモドーロタイマー</h2>
+      <div class="mb-2 flex flex-wrap justify-center items-center gap-2">
+        <select id="presetSelect" class="border p-2 rounded-lg w-full sm:w-auto">
+          <option value="25">25分（標準）</option>
+          <option value="3">3分</option>
+          <option value="5">5分</option>
+          <option value="10">10分</option>
+          <option value="15">15分</option>
+          <option value="custom">自分で入力する</option>
+        </select>
+        <input type="number" id="customMinutes" class="border p-2 rounded-lg w-full sm:w-24" placeholder="分数" style="display:none;" min="1">
+      </div>
+      <div class="text-5xl font-mono text-green-600" id="timer">25:00</div>
+      <div class="mt-4 flex flex-wrap justify-center gap-2">
+        <button id="startBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl">スタート</button>
+        <button id="resetBtn" class="bg-gray-300 hover:bg-gray-400 text-black px-4 py-2 rounded-xl">リセット</button>
+      </div>
+    </div>
+
+    <!-- Text Input Section -->
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold mb-2">新しい作業ログ</h2>
+      <input id="taskTitle" type="text" class="w-full mb-2 p-2 border rounded-xl" placeholder="タイトル">
+      <textarea id="taskInput" rows="4" class="w-full p-2 border rounded-xl" placeholder="作業内容やメモ"></textarea>
+      <input id="taskTag" type="text" class="w-full mt-2 p-2 border rounded-xl" placeholder="タグ（任意）">
+      <button id="saveLogBtn" class="mt-2 w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl">保存</button>
+    </div>
+
+    <!-- Logs Display -->
+    <div class="mb-4 flex justify-end gap-2">
+      <button onclick="sortLogsAsc()" class="text-sm text-blue-600 hover:underline">古い順に並び替え</button>
+      <button onclick="sortLogsDesc()" class="text-sm text-blue-600 hover:underline">新しい順に並び替え</button>
+    </div>
+
+    <div>
+      <h2 class="text-xl font-semibold mb-2">あなたの作業メモ</h2>
+      <ul id="logList" class="space-y-2 text-sm text-gray-800"></ul>
+    </div>
+
+    <div class="mt-4">
+      <h2 class="text-lg font-semibold mb-2">日別集計</h2>
+      <ul id="summaryList" class="text-sm text-gray-700"></ul>
+    </div>
+  </div>
+
+<script>
+  let timer, isRunning = false, time = 25 * 60;
+  const timerDisplay = document.getElementById("timer");
+  const startBtn = document.getElementById("startBtn");
+  const resetBtn = document.getElementById("resetBtn");
+  const presetSelect = document.getElementById("presetSelect");
+  const customMinutes = document.getElementById("customMinutes");
+  const saveLogBtn = document.getElementById("saveLogBtn");
+
+  function updateTimerDisplay() {
+    const minutes = String(Math.floor(time / 60)).padStart(2, '0');
+    const seconds = String(time % 60).padStart(2, '0');
+    timerDisplay.textContent = `${minutes}:${seconds}`;
+  }
+
+  function startTimer() {
+    if (isRunning) return;
+    isRunning = true;
+    timer = setInterval(() => {
+      if (time <= 0) {
+        clearInterval(timer);
+        isRunning = false;
+        alert("おつかれさまでした");
+        return;
+      }
+      time--;
+      updateTimerDisplay();
+    }, 1000);
+  }
+
+  function resetTimer() {
+    clearInterval(timer);
+    isRunning = false;
+    const selected = presetSelect.value;
+    if (selected === "custom" && customMinutes.value) {
+      time = parseInt(customMinutes.value) * 60;
+    } else {
+      time = parseInt(selected) * 60;
+    }
+    updateTimerDisplay();
+  }
+
+  presetSelect.addEventListener("change", () => {
+    if (presetSelect.value === "custom") {
+      customMinutes.style.display = "inline-block";
+    } else {
+      customMinutes.style.display = "none";
+      time = parseInt(presetSelect.value) * 60;
+      updateTimerDisplay();
+    }
+  });
+
+  customMinutes.addEventListener("input", () => {
+    if (customMinutes.value) {
+      time = parseInt(customMinutes.value) * 60;
+      updateTimerDisplay();
+    }
+  });
+
+  startBtn.onclick = startTimer;
+  resetBtn.onclick = resetTimer;
+  updateTimerDisplay();
+
+  saveLogBtn.onclick = function () {
+    const title = document.getElementById("taskTitle").value.trim();
+    const text = document.getElementById("taskInput").value.trim();
+    const tag = document.getElementById("taskTag").value.trim();
+    if (!title && !text) return;
+    const timestamp = new Date().toLocaleString();
+    const entry = { timestamp, title, text, tag };
+    const logs = JSON.parse(localStorage.getItem("pomodoroLogs") || "[]");
+    logs.unshift(entry);
+    localStorage.setItem("pomodoroLogs", JSON.stringify(logs));
+    document.getElementById("taskTitle").value = "";
+    document.getElementById("taskInput").value = "";
+    document.getElementById("taskTag").value = "";
+    renderLogs();
+  }
+</script>
+
+<script>
+  let currentSort = "desc";
+  let currentTag = "";
+
+  function getLogs() {
+    return JSON.parse(localStorage.getItem("pomodoroLogs") || "[]").map(log => {
+      if (typeof log === "string") {
+        return {
+          timestamp: "(旧データ)",
+          title: "旧形式ログ",
+          text: log,
+          tag: "未分類"
+        };
+      } else {
+        return Object.assign({ tag: "未分類" }, log);
+      }
+    });
+  }
+
+    function exportLogs() {
+    const data = JSON.stringify(getLogs(), null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pomodoro_logs.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importLogs(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const logs = JSON.parse(e.target.result);
+        if (Array.isArray(logs)) {
+          localStorage.setItem("pomodoroLogs", JSON.stringify(logs));
+          renderLogs();
+          alert("データをインポートしました。");
+        } else {
+          alert("インポート形式が不正です。");
+        }
+      } catch {
+        alert("読み込みに失敗しました。");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+
+
+
+  function renderLogs() {
+    const logs = getLogs();
+    const keyword = document.getElementById("searchInput")?.value.toLowerCase() || "";
+    const selectedTagElement = document.getElementById("tagFilter");
+    if (selectedTagElement) {
+      currentTag = selectedTagElement.value;
+    }
+
+    const filteredLogs = logs.filter(log => {
+      const matchKeyword = !keyword || (log.title + log.text).toLowerCase().includes(keyword);
+      const matchTag = currentTag === "" || log.tag === currentTag;
+      return matchKeyword && matchTag;
+    });
+
+    if (currentSort === "asc") filteredLogs.reverse();
+
+    const logList = document.getElementById("logList");
+    if (!logList) return;
+    logList.innerHTML = "";
+
+    filteredLogs.forEach((log, index) => {
+      const color = stringToColor(log.tag);
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <div class="bg-gray-200 p-3 rounded-lg relative">
+          <div class="absolute top-2 right-2 flex gap-2">
+            <button class="text-blue-500 hover:text-blue-700 text-xs" onclick="showEditForm(${index})">編集</button>
+            <button class="text-red-500 hover:text-red-700 text-xs" onclick="deleteLog(${index})">削除</button>
+          </div>
+          <div class="text-xs text-gray-500">${log.timestamp}</div>
+          <div class="font-semibold">${log.title}</div>
+          <div>${log.text}</div>
+          <span class="inline-block text-white text-xs px-2 py-1 rounded" style="background-color: ${color}">${log.tag}</span>
+        </div>
+      `;
+      logList.appendChild(li);
+    });
+
+    renderSummary(filteredLogs);
+    updateTagFilterOptions(logs);
+  }
+
+  // 安心表示：ローカルストレージに保存している旨を明示
+  document.addEventListener("DOMContentLoaded", () => {
+    const notice = document.createElement("div");
+    notice.className = "text-xs text-gray-500 text-center mt-4";
+    notice.textContent = "※ あなたのデータはこのブラウザ内にのみ保存されます。外部サーバーには送信されません。";
+    document.body.appendChild(notice);
+
+    // エクスポート・インポートボタンを追加
+    const control = document.createElement("div");
+    control.className = "flex justify-center gap-4 mt-4";
+    control.innerHTML = `
+      <button onclick="exportLogs()" class="bg-green-500 hover:bg-green-600 text-white px-4 py-1 rounded">エクスポート</button>
+      <label class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded cursor-pointer">
+        インポート<input type="file" accept=".json" onchange="importLogs(event)" class="hidden">
+      </label>
+    `;
+    document.body.appendChild(control);
+
+    renderLogs();
+  });
+
+
+
+  function showEditForm(index) {
+    const logs = getLogs();
+    const log = logs[index];
+    const color = stringToColor(log.tag);
+    const newDiv = document.createElement("div");
+    newDiv.className = "fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50";
+    newDiv.innerHTML = `
+      <div class="bg-white p-4 rounded-xl w-96 shadow-xl">
+        <h3 class="text-lg font-bold mb-4">ログを編集</h3>
+        <label class="block text-sm font-semibold mb-1">タイトル</label>
+        <input id="editTitle" class="w-full p-2 border rounded mb-3" value="${log.title}" />
+        <label class="block text-sm font-semibold mb-1">本文</label>
+        <textarea id="editText" class="w-full p-2 border rounded mb-3" rows="4">${log.text}</textarea>
+        <label class="block text-sm font-semibold mb-1">タグ</label>
+        <input id="editTag" class="w-full p-2 border rounded mb-4" value="${log.tag}" style="background-color: ${color}; color: white;" />
+        <div class="flex justify-end gap-2">
+          <button class="bg-gray-300 px-4 py-2 rounded" onclick="this.closest('.fixed').remove()">キャンセル</button>
+          <button class="bg-blue-500 text-white px-4 py-2 rounded" onclick="saveEdit(${index})">保存</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(newDiv);
+  }
+
+  function saveEdit(index) {
+    const logs = getLogs();
+    logs[index].title = document.getElementById("editTitle").value;
+    logs[index].text = document.getElementById("editText").value;
+    logs[index].tag = document.getElementById("editTag").value;
+    localStorage.setItem("pomodoroLogs", JSON.stringify(logs));
+    document.querySelector(".fixed").remove();
+    renderLogs();
+  }
+
+  function deleteLog(index) {
+    const logs = getLogs();
+    logs.splice(index, 1);
+    localStorage.setItem("pomodoroLogs", JSON.stringify(logs));
+    renderLogs();
+  }
+
+  function sortLogsAsc() {
+    currentSort = "asc";
+    renderLogs();
+  }
+
+  function sortLogsDesc() {
+    currentSort = "desc";
+    renderLogs();
+  }
+
+  function renderSummary(logs) {
+    const summary = {};
+    logs.forEach(log => {
+      const date = log.timestamp.split(" ")[0];
+      if (!summary[date]) summary[date] = 0;
+      summary[date]++;
+    });
+    const summaryList = document.getElementById("summaryList");
+    if (!summaryList) return;
+    summaryList.innerHTML = Object.entries(summary)
+      .map(([date, count]) => `<li>${date}：${count} 件</li>`)
+      .join('');
+  }
+
+  function updateTagFilterOptions(logs) {
+    const tagFilter = document.getElementById("tagFilter");
+    if (!tagFilter) return;
+
+    const previousValue = tagFilter.value;
+
+    const tags = [...new Set(logs.map(log => log.tag || "未分類"))];
+    tagFilter.innerHTML = `<option value="">すべてのタグ</option>` +
+      tags.map(tag => `<option value="${tag}">${tag}</option>`).join('');
+
+    tagFilter.value = previousValue;
+  }
+
+  function stringToColor(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const color = `hsl(${hash % 360}, 70%, 60%)`;
+    return color;
+  }
+
+  document.addEventListener("DOMContentLoaded", renderLogs);
+</script>
+
+
+
+
+</body>
+</html>
